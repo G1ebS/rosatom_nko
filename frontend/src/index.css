@@ -1,0 +1,260 @@
+/* Официальные шрифты Росатома */
+@import './fonts.css';
+
+/* Google Font (fallback) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Базовые перезаписи */
+:root{
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --muted: #6B7280;
+}
+
+/* body */
+body {
+    @apply bg-white text-gray-800;
+    font-family: 'Rosatom', 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+}
+
+/* Контейнер */
+.container-max {
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Кнопки с плавными анимациями */
+.btn-primary{
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-modern text-white font-semibold shadow-modern;
+    background: linear-gradient(135deg, #004AAD 0%, #0066CC 100%);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, box-shadow;
+}
+.btn-primary:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0, 74, 173, 0.2);
+}
+.btn-primary:active{
+    transform: translateY(0) scale(0.98);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-outline{
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-modern border-2 border-primary text-primary font-semibold;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: background-color, color, transform;
+}
+.btn-outline:hover{
+    background: linear-gradient(135deg, #004AAD 0%, #0066CC 100%);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 74, 173, 0.15);
+}
+.btn-accent{
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-modern text-white font-semibold shadow-modern;
+    background: linear-gradient(135deg, #00D4AA 0%, #00b894 100%);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, box-shadow;
+}
+.btn-accent:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 212, 170, 0.3);
+    filter: brightness(1.05);
+}
+.btn-accent:active{
+    transform: translateY(0) scale(0.98);
+    transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-accent:disabled{
+    transform: none !important;
+}
+.btn-danger{
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-modern text-white font-semibold shadow-sm;
+    background-color: #FF0000;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-danger:hover{
+    background-color: #cc0000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+}
+
+/* Современные карточки с плавными анимациями */
+.card {
+    @apply bg-white rounded-modern shadow-modern p-6;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, box-shadow;
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 74, 173, 0.12);
+}
+
+.card-floating {
+    @apply bg-white rounded-modern-lg shadow-floating p-8;
+    animation: float 6s ease-in-out infinite;
+    will-change: transform;
+}
+
+/* Плавные анимации */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.slide-in-right {
+    animation: slideInRight 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.scale-in {
+    animation: scaleIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Параллакс эффект */
+.parallax {
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+/* Плавные переходы для всех интерактивных элементов */
+* {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Мелкие утилиты */
+.kicker {
+    @apply text-xs font-semibold uppercase tracking-wider text-primary-200;
+}
+
+/* Анимации */
+.hero-decor {
+    animation: float 8s ease-in-out infinite;
+}
+
+/* Небольшая карточная сетка */
+.grid-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+/* Акцентные теги */
+.tag {
+    @apply inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-primary-50 text-primary;
+}
+
+/* Footer */
+.footer {
+    background: linear-gradient(180deg,#ffffff00,#f3f6fb);
+}
+
+/* Градиенты */
+.gradient-primary {
+    background: linear-gradient(135deg, #004AAD 0%, #0066CC 100%);
+}
+
+.gradient-accent {
+    background: linear-gradient(135deg, #00D4AA 0%, #00b894 100%);
+}
+
+.gradient-soft {
+    background: linear-gradient(135deg, rgba(0, 74, 173, 0.05) 0%, rgba(0, 212, 170, 0.05) 100%);
+}
+
+/* Скролл */
+.smooth-scroll {
+    scroll-behavior: smooth;
+}
+
+/* Кастомный скроллбар */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #00D4AA #f1f1f1;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #004AAD 0%, #00D4AA 100%);
+    border-radius: 10px;
+    border: 2px solid #f1f1f1;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #0066CC 0%, #00b894 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #004AAD 0%, #00D4AA 100%);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #0066CC 0%, #00b894 100%);
+}
