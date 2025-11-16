@@ -1,0 +1,860 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
+import { ngos } from '../data/ngos'
+import NGOCard from '../components/NGOCard'
+import { events, eventCategoryColors } from '../data/events'
+import { materials } from '../data/materials'
+import EventItem from '../components/EventItem'
+import MaterialItem from '../components/MaterialItem'
+import Button from '../components/Button'
+
+export default function ProfilePage(){
+    const { user, login } = useAuth()
+    const { showToast } = useToast()
+    const [activeSection, setActiveSection] = useState('favorites')
+    const [addNGOForm, setAddNGOForm] = useState({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })
+    const [addNewsForm, setAddNewsForm] = useState({ title: '', content: '' })
+    const [submitting, setSubmitting] = useState(false)
+    
+    // Загружаем plannedEvents из localStorage (все хуки должны быть до условного возврата)
+    const [plannedEvents, setPlannedEvents] = React.useState(() => {
+        try {
+            const saved = localStorage.getItem('plannedEvents')
+            if (saved) {
+                const parsed = JSON.parse(saved)
+                return new Set(parsed)
+            }
+        } catch (e) {
+            console.error('Error loading planned events:', e)
+        }
+        return new Set()
+    })
+    
+    // Слушаем изменения localStorage для синхронизации между вкладками
+    React.useEffect(() => {
+        const handleStorageChange = (e) => {
+            if (e.key === 'plannedEvents') {
+                try {
+                    const parsed = JSON.parse(e.newValue || '[]')
+                    setPlannedEvents(new Set(parsed))
+                } catch (err) {
+                    console.error('Error parsing planned events:', err)
+                }
+            }
+        }
+        
+        window.addEventListener('storage', handleStorageChange)
+        
+        // Также проверяем при фокусе на окне (для синхронизации в той же вкладке)
+        const handleFocus = () => {
+            try {
+                const saved = localStorage.getItem('plannedEvents')
+                if (saved) {
+                    const parsed = JSON.parse(saved)
+                    setPlannedEvents(new Set(parsed))
+                }
+            } catch (e) {
+                console.error('Error loading planned events:', e)
+            }
+        }
+        
+        window.addEventListener('focus', handleFocus)
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange)
+            window.removeEventListener('focus', handleFocus)
+        }
+    }, [])
+    const [editingNGO, setEditingNGO] = useState(null)
+    const [editNGOForm, setEditNGOForm] = useState({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })
+    const [editingEvent, setEditingEvent] = useState(null)
+    const [editEventForm, setEditEventForm] = useState({ title: '', description: '', date: '', time: '', city: '', category: '', online: false })
+    // Условный возврат должен быть после всех хуков
+    if (!user) return null
+
+    const favoriteNgos = ngos.filter(n => (user.favorites || []).includes(n.id))
+    const myNgos = ngos.filter(n => n.created_by === user.id)
+    const myEvents = events.filter(e => e.created_by === user.id)
+    const plannedEventsList = events.filter(e => plannedEvents.has(e.id))
+
+
+    const menuItems = [
+        { id: 'favorites', label: 'Избранные НКО', icon: '⭐' },
+        { id: 'my-ngos', label: 'Мои НКО', icon: '🏢' },
+        { id: 'library', label: 'Библиотека', icon: '📚' },
+        { id: 'planned-events', label: 'События в планах', icon: '📋' },
+        { id: 'events', label: 'Мои события', icon: '📅' },
+        { id: 'add-ngo', label: 'Добавить НКО', icon: '➕' },
+        { id: 'moderation', label: 'Модерация', icon: '✓' },
+        { id: 'add-news', label: 'Добавить новость', icon: '📰' }
+    ]
+    
+    // В реальном приложении сохраненные материалы будут из API
+    const savedMaterials = materials.filter(m => {
+        // Здесь будет проверка через API или localStorage
+        return false // Пока пусто, так как нет сохранения
+    })
+    
+    const removeFromFavorites = (ngoId) => {
+        if (!user) return
+        const updatedFavorites = (user.favorites || []).filter(id => id !== ngoId)
+        const updated = { ...user, favorites: updatedFavorites }
+        login(localStorage.getItem('jwt') || 'fake', updated)
+        showToast('НКО удалено из избранного', 'success')
+    }
+    
+    const handleAddNGO = async (e) => {
+        e.preventDefault()
+        if (!addNGOForm.name || !addNGOForm.category || !addNGOForm.description) {
+            showToast('Заполните все поля', 'warning')
+            return
+        }
+        setSubmitting(true)
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            showToast('НКО отправлено на модерацию', 'success')
+            setAddNGOForm({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })
+        } catch (error) {
+            showToast('Ошибка отправки заявки', 'error')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+    
+    const handleAddNews = async (e) => {
+        e.preventDefault()
+        if (!addNewsForm.title || !addNewsForm.content) {
+            showToast('Заполните все поля', 'warning')
+            return
+        }
+        setSubmitting(true)
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            showToast('Новость отправлена на модерацию', 'success')
+            setAddNewsForm({ title: '', content: '' })
+        } catch (error) {
+            showToast('Ошибка отправки новости', 'error')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    return (
+        <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row gap-6">
+                {/* Вертикальное меню слева */}
+                <aside className="w-full md:w-64 flex-shrink-0">
+                    <div className="card">
+                        <div className="p-4 border-b border-gray-200">
+                            <h2 className="text-lg font-bold text-[#333333]">Личный кабинет</h2>
+                            <p className="text-sm text-gray-500 mt-1">{user.name}</p>
+                        </div>
+                        <nav className="p-2 relative">
+                            <ul className="space-y-1 relative">
+                                {menuItems.map(item => (
+                                    <li key={item.id} className="relative">
+                                        <button
+                                            onClick={() => setActiveSection(item.id)}
+                                            className={`w-full text-left px-4 py-3 rounded-modern text-sm font-medium transition-all duration-300 min-h-[44px] flex items-center relative ${
+                                                activeSection === item.id
+                                                    ? 'bg-gradient-to-r from-accent to-accent-600 text-white shadow-modern'
+                                                    : 'text-[#333333] hover:bg-gray-50 bg-transparent'
+                                            }`}
+                                            style={activeSection === item.id ? { zIndex: 10 } : {}}
+                                            aria-label={item.label}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </nav>
+                    </div>
+                </aside>
+
+                {/* Контентная область */}
+                <main className="flex-1">
+                {activeSection === 'favorites' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Избранные НКО</h1>
+                        {favoriteNgos.length ? (
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {favoriteNgos.map(n => (
+                                    <div key={n.id} className="relative">
+                                        <NGOCard ngo={n} />
+                                        <button
+                                            onClick={() => removeFromFavorites(n.id)}
+                                            className="absolute top-4 right-4 min-w-[44px] min-h-[44px] bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-modern hover:bg-red-50 transition-all group"
+                                            title="Удалить из избранного"
+                                            aria-label="Удалить из избранного"
+                                        >
+                                            <svg className="w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="card text-center py-12">
+                                <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                </svg>
+                                <p className="text-gray-500 text-lg">Нет избранных НКО</p>
+                                <p className="text-gray-400 text-sm mt-2">Добавьте НКО в избранное, чтобы они отображались здесь</p>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {activeSection === 'my-ngos' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Мои НКО</h1>
+                        {myNgos.length ? (
+                            <div className="space-y-4">
+                                {myNgos.map(n => (
+                                    editingNGO === n.id ? (
+                                        <div key={n.id} className="card">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h2 className="text-xl font-bold text-primary">Редактировать НКО</h2>
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingNGO(null)
+                                                        setEditNGOForm({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })
+                                                    }}
+                                                    className="text-gray-400 hover:text-gray-600"
+                                                    aria-label="Закрыть форму редактирования"
+                                                >
+                                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <form onSubmit={async (e) => {
+                                                e.preventDefault()
+                                                setSubmitting(true)
+                                                try {
+                                                    await new Promise(resolve => setTimeout(resolve, 1000))
+                                                    showToast('НКО обновлено (в реальном приложении здесь будет запрос к API)', 'success')
+                                                    setEditingNGO(null)
+                                                    setEditNGOForm({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })
+                                                } catch (error) {
+                                                    showToast('Ошибка обновления НКО', 'error')
+                                                } finally {
+                                                    setSubmitting(false)
+                                                }
+                                            }} className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-[#333333] mb-2">Название НКО</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={editNGOForm.name}
+                                                        onChange={(e) => setEditNGOForm({...editNGOForm, name: e.target.value})}
+                                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-[#333333] mb-2">Категория</label>
+                                                    <select 
+                                                        value={editNGOForm.category}
+                                                        onChange={(e) => setEditNGOForm({...editNGOForm, category: e.target.value})}
+                                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                        required
+                                                    >
+                                                        <option value="">Выберите категорию</option>
+                                                        <option value="Соцподдержка">Соцподдержка</option>
+                                                        <option value="Экология">Экология</option>
+                                                        <option value="Культура">Культура</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-[#333333] mb-2">Описание</label>
+                                                    <textarea 
+                                                        value={editNGOForm.description}
+                                                        onChange={(e) => setEditNGOForm({...editNGOForm, description: e.target.value})}
+                                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                        rows="4"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-[#333333] mb-2">Адрес</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={editNGOForm.address}
+                                                        onChange={(e) => setEditNGOForm({...editNGOForm, address: e.target.value})}
+                                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                    />
+                                                </div>
+                                                <div className="grid md:grid-cols-3 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">Сайт</label>
+                                                        <input 
+                                                            type="url" 
+                                                            value={editNGOForm.website}
+                                                            onChange={(e) => setEditNGOForm({...editNGOForm, website: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                            placeholder="https://..."
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">ВКонтакте</label>
+                                                        <input 
+                                                            type="url" 
+                                                            value={editNGOForm.vk}
+                                                            onChange={(e) => setEditNGOForm({...editNGOForm, vk: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                            placeholder="https://vk.com/..."
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">Telegram</label>
+                                                        <input 
+                                                            type="url" 
+                                                            value={editNGOForm.telegram}
+                                                            onChange={(e) => setEditNGOForm({...editNGOForm, telegram: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                            placeholder="https://t.me/..."
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <Button
+                                                        type="submit"
+                                                        variant="accent"
+                                                        disabled={submitting}
+                                                        ariaLabel="Сохранить изменения"
+                                                    >
+                                                        {submitting ? 'Сохранение...' : 'Сохранить изменения'}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setEditingNGO(null)
+                                                            setEditNGOForm({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })
+                                                        }}
+                                                        ariaLabel="Отменить редактирование"
+                                                    >
+                                                        Отменить
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    ) : (
+                                        <div key={n.id} className="card">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <h3 className="text-xl font-bold text-primary">{n.name}</h3>
+                                                        {n.status === 'pending' && (
+                                                            <span className="px-3 py-1 text-xs font-semibold rounded-modern bg-yellow-100 text-yellow-800">
+                                                                На модерации
+                                                            </span>
+                                                        )}
+                                                        {n.status === 'approved' && (
+                                                            <span className="px-3 py-1 text-xs font-semibold rounded-modern bg-green-100 text-green-800">
+                                                                Одобрено
+                                                            </span>
+                                                        )}
+                                                        {n.status === 'rejected' && (
+                                                            <span className="px-3 py-1 text-xs font-semibold rounded-modern bg-red-100 text-red-800">
+                                                                Отклонено
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-gray-600 mb-2">{n.category} • {n.city}</p>
+                                                    <p className="text-gray-700">{n.short_description}</p>
+                                                </div>
+                                                <div className="flex gap-2 ml-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setEditingNGO(n.id)
+                                                            setEditNGOForm({
+                                                                name: n.name,
+                                                                category: n.category,
+                                                                description: n.full_description || n.short_description,
+                                                                address: n.address || '',
+                                                                website: n.website || '',
+                                                                vk: n.vk || '',
+                                                                telegram: n.telegram || ''
+                                                            })
+                                                        }}
+                                                        ariaLabel={`Редактировать НКО ${n.name}`}
+                                                    >
+                                                        Редактировать
+                                                    </Button>
+                                                    <Button
+                                                        variant="accent"
+                                                        size="sm"
+                                                        href={`/ngos/${n.id}`}
+                                                        ariaLabel={`Открыть НКО ${n.name}`}
+                                                    >
+                                                        Открыть
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="card text-center py-12">
+                                <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                <p className="text-gray-500 text-lg">У вас пока нет созданных НКО</p>
+                                <p className="text-gray-400 text-sm mt-2">Добавьте НКО, чтобы они отображались здесь</p>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {activeSection === 'library' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Библиотека</h1>
+                        {savedMaterials.length ? (
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {savedMaterials.map(m => <MaterialItem key={m.id} material={m} />)}
+                            </div>
+                        ) : (
+                            <div className="card text-center py-12">
+                                <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                </svg>
+                                <p className="text-gray-500 text-lg">Библиотека пуста</p>
+                                <p className="text-gray-400 text-sm mt-2">Сохраняйте материалы из базы знаний, чтобы они отображались здесь</p>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {activeSection === 'planned-events' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">События в планах</h1>
+                        {plannedEventsList.length ? (
+                            <div className="space-y-4">
+                                {plannedEventsList.map(ev => <EventItem key={ev.id} event={ev} />)}
+                            </div>
+                        ) : (
+                            <div className="bg-white border border-[#D3D3D3] rounded-lg p-8 text-center">
+                                <p className="text-gray-500">Нет событий в планах</p>
+                                <p className="text-sm text-gray-400 mt-2">Добавьте события в планы из календаря</p>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {activeSection === 'events' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Мои события</h1>
+                        {myEvents.length ? (
+                            <div className="space-y-4">
+                                {myEvents.map(ev => {
+                                    const colors = eventCategoryColors[ev.category] || {
+                                        bg: '#00D4AA',
+                                        border: '#00b894',
+                                        text: '#ffffff'
+                                    }
+                                    
+                                    return editingEvent === ev.id ? (
+                                        <div key={ev.id} className="card">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h2 className="text-xl font-bold text-primary">Редактировать событие</h2>
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingEvent(null)
+                                                        setEditEventForm({ title: '', description: '', date: '', time: '', city: '', category: '', online: false })
+                                                    }}
+                                                    className="text-gray-400 hover:text-gray-600"
+                                                    aria-label="Закрыть форму редактирования"
+                                                >
+                                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <form onSubmit={async (e) => {
+                                                e.preventDefault()
+                                                setSubmitting(true)
+                                                try {
+                                                    await new Promise(resolve => setTimeout(resolve, 1000))
+                                                    showToast('Событие обновлено (в реальном приложении здесь будет запрос к API)', 'success')
+                                                    setEditingEvent(null)
+                                                    setEditEventForm({ title: '', description: '', date: '', time: '', city: '', category: '', online: false })
+                                                } catch (error) {
+                                                    showToast('Ошибка обновления события', 'error')
+                                                } finally {
+                                                    setSubmitting(false)
+                                                }
+                                            }} className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-[#333333] mb-2">Название события</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={editEventForm.title}
+                                                        onChange={(e) => setEditEventForm({...editEventForm, title: e.target.value})}
+                                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-[#333333] mb-2">Описание</label>
+                                                    <textarea 
+                                                        value={editEventForm.description}
+                                                        onChange={(e) => setEditEventForm({...editEventForm, description: e.target.value})}
+                                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                        rows="4"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">Дата</label>
+                                                        <input 
+                                                            type="date" 
+                                                            value={editEventForm.date}
+                                                            onChange={(e) => setEditEventForm({...editEventForm, date: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">Время</label>
+                                                        <input 
+                                                            type="time" 
+                                                            value={editEventForm.time}
+                                                            onChange={(e) => setEditEventForm({...editEventForm, time: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">Город</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={editEventForm.city}
+                                                            onChange={(e) => setEditEventForm({...editEventForm, city: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-[#333333] mb-2">Категория</label>
+                                                        <select 
+                                                            value={editEventForm.category}
+                                                            onChange={(e) => setEditEventForm({...editEventForm, category: e.target.value})}
+                                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                                                            required
+                                                        >
+                                                            <option value="">Выберите категорию</option>
+                                                            <option value="Мероприятия">Мероприятия</option>
+                                                            <option value="Обучение">Обучение</option>
+                                                            <option value="Развитие">Развитие</option>
+                                                            <option value="Бизнес повестка">Бизнес повестка</option>
+                                                            <option value="Спортивные сообщества">Спортивные сообщества</option>
+                                                            <option value="Комитет добрых дел">Комитет добрых дел</option>
+                                                            <option value="Поздравления, награждения">Поздравления, награждения</option>
+                                                            <option value="Завтрак с СЕО">Завтрак с СЕО</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={editEventForm.online}
+                                                            onChange={(e) => setEditEventForm({...editEventForm, online: e.target.checked})}
+                                                            className="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent"
+                                                        />
+                                                        <span className="text-sm font-semibold text-[#333333]">Онлайн-мероприятие</span>
+                                                    </label>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <Button
+                                                        type="submit"
+                                                        variant="accent"
+                                                        disabled={submitting}
+                                                        ariaLabel="Сохранить изменения"
+                                                    >
+                                                        {submitting ? 'Сохранение...' : 'Сохранить изменения'}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setEditingEvent(null)
+                                                            setEditEventForm({ title: '', description: '', date: '', time: '', city: '', category: '', online: false })
+                                                        }}
+                                                        ariaLabel="Отменить редактирование"
+                                                    >
+                                                        Отменить
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    ) : (
+                                        <div 
+                                            key={ev.id} 
+                                            className="card cursor-pointer hover:shadow-modern transition-all relative overflow-hidden"
+                                            style={{ borderLeft: `4px solid ${colors.border}` }}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span 
+                                                            className="px-2 py-1 rounded text-xs font-semibold"
+                                                            style={{ 
+                                                                backgroundColor: colors.bg,
+                                                                color: colors.text
+                                                            }}
+                                                        >
+                                                            {ev.category || 'Событие'}
+                                                        </span>
+                                                        {ev.time && (
+                                                            <span className="text-sm text-gray-500">🕐 {ev.time}</span>
+                                                        )}
+                                                        {ev.online !== undefined && (
+                                                            ev.online ? (
+                                                                <span className="text-xs text-accent">🌐 Онлайн</span>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-500">🏢 Офлайн</span>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-primary mb-2">{ev.title}</h3>
+                                                    <p className="text-gray-700 mb-2">{ev.description}</p>
+                                                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                        <span>📅 {new Date(ev.date).toLocaleDateString('ru-RU', { 
+                                                            day: 'numeric', 
+                                                            month: 'long', 
+                                                            year: 'numeric' 
+                                                        })}</span>
+                                                        <span>📍 {ev.city}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2 ml-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setEditingEvent(ev.id)
+                                                            setEditEventForm({
+                                                                title: ev.title,
+                                                                description: ev.description,
+                                                                date: ev.date,
+                                                                time: ev.time || '',
+                                                                city: ev.city,
+                                                                category: ev.category || '',
+                                                                online: ev.online || false
+                                                            })
+                                                        }}
+                                                        ariaLabel={`Редактировать событие ${ev.title}`}
+                                                    >
+                                                        Редактировать
+                                                    </Button>
+                                                    <Button
+                                                        variant="accent"
+                                                        size="sm"
+                                                        href={`/events/${ev.id}`}
+                                                        ariaLabel={`Открыть событие ${ev.title}`}
+                                                    >
+                                                        Открыть
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="bg-white border border-[#D3D3D3] rounded-lg p-8 text-center">
+                                <p className="text-gray-500">Нет созданных событий</p>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                {activeSection === 'add-ngo' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Добавить НКО</h1>
+                        <div className="card">
+                            <form onSubmit={handleAddNGO} className="space-y-4">
+                                <div>
+                                    <label htmlFor="ngo-name" className="block text-sm font-semibold text-[#333333] mb-2">Название НКО</label>
+                                    <input 
+                                        id="ngo-name"
+                                        type="text" 
+                                        value={addNGOForm.name}
+                                        onChange={(e) => setAddNGOForm({...addNGOForm, name: e.target.value})}
+                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="ngo-category" className="block text-sm font-semibold text-[#333333] mb-2">Категория</label>
+                                    <select 
+                                        id="ngo-category"
+                                        value={addNGOForm.category}
+                                        onChange={(e) => setAddNGOForm({...addNGOForm, category: e.target.value})}
+                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                        required
+                                    >
+                                        <option value="">Выберите категорию</option>
+                                        <option value="Соцподдержка">Соцподдержка</option>
+                                        <option value="Экология">Экология</option>
+                                        <option value="Культура">Культура</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="ngo-description" className="block text-sm font-semibold text-[#333333] mb-2">Описание</label>
+                                    <textarea 
+                                        id="ngo-description"
+                                        rows="4" 
+                                        value={addNGOForm.description}
+                                        onChange={(e) => setAddNGOForm({...addNGOForm, description: e.target.value})}
+                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                        required
+                                    ></textarea>
+                                </div>
+                                <div>
+                                    <label htmlFor="ngo-address" className="block text-sm font-semibold text-[#333333] mb-2">Адрес</label>
+                                    <input 
+                                        id="ngo-address"
+                                        type="text" 
+                                        value={addNGOForm.address}
+                                        onChange={(e) => setAddNGOForm({...addNGOForm, address: e.target.value})}
+                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                        placeholder="ул. Примерная, 1"
+                                    />
+                                </div>
+                                <div className="grid md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label htmlFor="ngo-website" className="block text-sm font-semibold text-[#333333] mb-2">Сайт</label>
+                                        <input 
+                                            id="ngo-website"
+                                            type="url" 
+                                            value={addNGOForm.website}
+                                            onChange={(e) => setAddNGOForm({...addNGOForm, website: e.target.value})}
+                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                            placeholder="https://..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="ngo-vk" className="block text-sm font-semibold text-[#333333] mb-2">ВКонтакте</label>
+                                        <input 
+                                            id="ngo-vk"
+                                            type="url" 
+                                            value={addNGOForm.vk}
+                                            onChange={(e) => setAddNGOForm({...addNGOForm, vk: e.target.value})}
+                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                            placeholder="https://vk.com/..."
+                                        />
+                                    </div>
+        <div>
+                                        <label htmlFor="ngo-telegram" className="block text-sm font-semibold text-[#333333] mb-2">Telegram</label>
+                                        <input 
+                                            id="ngo-telegram"
+                                            type="url" 
+                                            value={addNGOForm.telegram}
+                                            onChange={(e) => setAddNGOForm({...addNGOForm, telegram: e.target.value})}
+                                            className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                            placeholder="https://t.me/..."
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button 
+                                        type="submit" 
+                                        variant="primary"
+                                        loading={submitting}
+                                        disabled={submitting}
+                                        ariaLabel="Сохранить НКО"
+                                    >
+                                        Сохранить
+                                    </Button>
+                                    <Button 
+                                        type="button" 
+                                        variant="outline"
+                                        onClick={() => setAddNGOForm({ name: '', category: '', description: '', address: '', website: '', vk: '', telegram: '' })}
+                                        ariaLabel="Отменить"
+                                    >
+                                        Отмена
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+                )}
+
+                {activeSection === 'moderation' && (
+                    <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Модерация</h1>
+                        <div className="bg-white border border-[#D3D3D3] rounded-lg p-6">
+                            <p className="text-gray-500">Здесь будет список заявок на модерацию</p>
+                        </div>
+            </section>
+                )}
+
+                {activeSection === 'add-news' && (
+            <section>
+                        <h1 className="text-2xl font-bold text-[#333333] mb-6">Добавить новость</h1>
+                        <div className="card">
+                            <form onSubmit={handleAddNews} className="space-y-4">
+                                <div>
+                                    <label htmlFor="news-title" className="block text-sm font-semibold text-[#333333] mb-2">Заголовок</label>
+                                    <input 
+                                        id="news-title"
+                                        type="text" 
+                                        value={addNewsForm.title}
+                                        onChange={(e) => setAddNewsForm({...addNewsForm, title: e.target.value})}
+                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="news-content" className="block text-sm font-semibold text-[#333333] mb-2">Текст новости</label>
+                                    <textarea 
+                                        id="news-content"
+                                        rows="6" 
+                                        value={addNewsForm.content}
+                                        onChange={(e) => setAddNewsForm({...addNewsForm, content: e.target.value})}
+                                        className="w-full border-2 border-gray-200 rounded-modern px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
+                                        required
+                                    ></textarea>
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button 
+                                        type="submit" 
+                                        variant="primary"
+                                        loading={submitting}
+                                        disabled={submitting}
+                                        ariaLabel="Опубликовать новость"
+                                    >
+                                        Опубликовать
+                                    </Button>
+                                    <Button 
+                                        type="button" 
+                                        variant="outline"
+                                        onClick={() => setAddNewsForm({ title: '', content: '' })}
+                                        ariaLabel="Отменить"
+                                    >
+                                        Отмена
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+            </section>
+                )}
+            </main>
+            </div>
+        </div>
+    )
+}
